@@ -15,12 +15,10 @@ public:
 	// Sets default values for this actor's properties
 	ACheckPoint();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-		// The name kind of explains itself. The only thing that is noteworthy
-		// is that the spawnpoint is relative to the owner (aka. this)
-		FVector SpawnPoint;
-
 protected:
+	// The name kind of explains itself. The only thing that is noteworthy
+	// is that the spawnpoint is relative to the owner (aka. this)
+	FVector SpawnPoint;
 	bool HasCoughtThisCheckpint{ false };
 
 	// Called when the game starts or when spawned

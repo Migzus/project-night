@@ -4,6 +4,7 @@
 #include "Components/MeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
+#include "TimerManager.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
 #include "SwitchBlockManager.h"
@@ -37,6 +38,12 @@ void APlayerMovement::BeginPlay()
 
 	//ASwitchBlockManager::CheckIsActive();
 
+	GetCharacterMovement()->MaxWalkSpeed = MaxSpeed;
+
+	StandardGravityScale = GetCharacterMovement()->GravityScale;
+
+	KeepVelocity = FRotator(InputDirection.GetSafeNormal().Rotation() + Camera->GetComponentRotation()).Vector();
+
 	// THIS WILL BE REMOVED //
 	SpawnPoint = FVector::UpVector * 15.0f;
 }
@@ -60,28 +67,35 @@ void APlayerMovement::Tick(float DeltaTime)
 
 	/////////////////////////////
 
-	//FVector _ { Camera->GetComponentRotation().Vector() };
-	//UE_LOG(LogTemp, Warning, TEXT("[%f, %f, %f]"), _.X, _.Y, _.Z)
+	if (GetCharacterMovement()->IsFalling())
+	{
+		GetCharacterMovement()->GravityScale = IsCrouching ? CrouchGravityScale : StandardGravityScale;
+	}
+	else
+	{
+		PreviousWallReference = nullptr;
+		CurrentAirDashCount = 0;
+	}
+
+	GetCharacterMovement()->MaxWalkSpeed = GetCharacterMovement()->IsFalling() ? AirbornSpeed : IsCrouching ? CrouchSpeed : MaxSpeed;
 
 	KeepVelocity = InputDirection.IsZero() ? KeepVelocity : FRotator(InputDirection.GetSafeNormal().Rotation() + Camera->GetComponentRotation()).Vector();
 	KeepVelocity.Z = _CurrentVelocity.Z = 0.0f;
 
-	Mesh->SetWorldRotation(_CurrentVelocity.Rotation());
+	FRotator _SmoothRotation{ FMath::Lerp(Mesh->GetRelativeRotation(), KeepVelocity.Rotation(), 0.2f) };
+
+	Mesh->SetWorldRotation(_SmoothRotation);
 }
 
 void APlayerMovement::MoveX(float value)
 {
 	FVector _Direction{ FVector::ZeroVector };
 
-	if (IsCameraForward && Camera != nullptr)
+	if (Camera != nullptr)
 	{
 		const FRotator _YawRotation{ FRotator(0.0f, Camera->GetComponentRotation().Yaw, 0.0f) };
 
 		_Direction = FRotationMatrix(_YawRotation).GetUnitAxis(EAxis::X);
-	}
-	else
-	{
-		_Direction = FVector::ForwardVector;
 	}
 
 	//KeepVelocity.X = value != 0.0f ? value : KeepVelocity.X;
@@ -96,15 +110,11 @@ void APlayerMovement::MoveY(float value)
 {
 	FVector _Direction{ FVector::ZeroVector };
 
-	if (IsCameraForward && Camera != nullptr)
+	if (Camera != nullptr)
 	{
 		const FRotator _YawRotation{ FRotator(0.0f, Camera->GetComponentRotation().Yaw, 0.0f) };
 
 		_Direction = FRotationMatrix(_YawRotation).GetUnitAxis(EAxis::Y);
-	}
-	else
-	{
-		_Direction = FVector::RightVector;
 	}
 
 	//KeepVelocity.Y = value != 0.0f ? value : KeepVelocity.Y;
@@ -113,16 +123,35 @@ void APlayerMovement::MoveY(float value)
 	AddMovementInput(_Direction, value);
 }
 
+void APlayerMovement::Dash()
+{
+	if (AirDashAmount > CurrentAirDashCount)
+	{
+		GetCharacterMovement()->AddForce(KeepVelocity.GetSafeNormal() * 100000.0f * DashForce);
+		CurrentAirDashCount++;
+		DashCooldown(0.2f);
+	}
+}
+
+void APlayerMovement::DashCooldown(float time)
+{
+	IsDashing = true;
+	GetWorldTimerManager().SetTimer(DashCooldownTimer, this, &APlayerMovement::StopDashing, time, false);
+}
+
+void APlayerMovement::StopDashing()
+{
+	IsDashing = false;
+}
+
 void APlayerMovement::JumpLocal()
 {
 	// TODO
-	// include a check beneath the player so that they can still "JUMP", even if they chenically are above ground
+	// include a check beneath the player so that they can still "JUMP", even if they technically are above ground
 
 	///////////////////////////////////////////////////////////
 
 	// if our character is still falling we want to enable wall jump
-	// (if we have only used one jump and wall jump right after, we have another jump, however if the player has already used
-	// their double jump then they will wall jump but fall after that)
 	if (GetCharacterMovement()->IsFalling())
 	{
 		// prepare the ray results
@@ -135,44 +164,47 @@ void APlayerMovement::JumpLocal()
 
 		ECollisionChannel _WallJumpChannel{ ECollisionChannel::ECC_GameTraceChannel1 };
 	    
-		DrawDebugLine(GetWorld(), _Start, _End, FColor::Red, false, 0.1f, 0, 6.0f);
+		//DrawDebugLine(GetWorld(), _Start, _End, FColor::Red, false, 0.1f, 0, 6.0f);
 
 		// cast a ray to see if there is any wall with the WallJump tag
 		if (GetWorld()->LineTraceSingleByChannel(_Hit, _Start, _End, _WallJumpChannel))
 		{
-			// We need the direction of the ray
-			FVector _DirectionalVector{ _End - _Start };
+			if (_Hit.GetActor() != PreviousWallReference)
+			{
+				// We need the direction of the ray
+				FVector _DirectionalVector{ _End - _Start };
 
-			_DirectionalVector.Z = 0.0f;
-			_DirectionalVector = _DirectionalVector.GetSafeNormal();
+				_DirectionalVector.Z = 0.0f;
+				_DirectionalVector = _DirectionalVector.GetSafeNormal();
 
-			// mirror the direction vector
-			_DirectionalVector = _DirectionalVector.MirrorByVector(_Hit.ImpactNormal);
-			_DirectionalVector *= 2000;
-			_DirectionalVector += FVector(0.0f, 0.0f, 1500.0f);
+				// mirror the direction vector
+				_DirectionalVector = _DirectionalVector.MirrorByVector(_Hit.ImpactNormal);
+				_DirectionalVector *= JumpOffWallSpeed;
+				_DirectionalVector += FVector::UpVector * WalljumpHeight;
 
-			// finally we set the our new velocity to the directional vector, included force
-			GetCharacterMovement()->Velocity = _DirectionalVector;
+				// finally we set the our new velocity to the directional vector, included force
+				GetCharacterMovement()->Velocity = _DirectionalVector;
+
+				PreviousWallReference = _Hit.GetActor();
+			}
 		}
 	}
 	
-	if (GetCharacterMovement()->IsCrouching() && !GetCharacterMovement()->IsFalling())
+	if (!GetCharacterMovement()->IsFalling())
 	{
-		bPressedJump = true;
-
-		if (GetCharacterMovement()->Velocity.IsNearlyZero())
+		if (IsCrouching)
 		{
 			HighJump();
-			//UE_LOG(LogTemp, Warning, TEXT("HIGH JUMP!"))
+			return;
 		}
-		else
+
+		if (IsDashing)
 		{
 			LongJump();
-			//UE_LOG(LogTemp, Warning, TEXT("LONG JUMP!!"))
+			return;
 		}
-	}
-	else
-	{
+
+		// otherwise just do a standard jump
 		Jump();
 	}
 }
@@ -184,28 +216,26 @@ void APlayerMovement::HighJump()
 	_Direction.X *= -1.0f;
 	_Direction.Y *= -1.0f;
 
-	//GetCharacterMovement()->Velocity.Z = 6000.0f;
-	//JumpKeyHoldTime = 0.0f;
 	GetCharacterMovement()->AddForce(_Direction * 100000.0f);
-
 }
 
 void APlayerMovement::LongJump()
 {
 	FVector _Direction{ FVector(KeepVelocity.GetSafeNormal().X * LongJumpSpeed, KeepVelocity.GetSafeNormal().Y * LongJumpSpeed, LongJumpHeight) };
 
-	//GetCharacterMovement()->AddInputVector(_Direction * 10000000.0f);
 	GetCharacterMovement()->AddForce(_Direction * 100000.0f);
 }
 
 void APlayerMovement::Crouching()
 {
-	Super::Crouch();
+	GetCharacterMovement()->MaxWalkSpeed = CrouchSpeed;
+	IsCrouching = true;
 }
 
 void APlayerMovement::UnCrouching()
 {
-	Super::UnCrouch();
+	GetCharacterMovement()->MaxWalkSpeed = MaxSpeed;
+	IsCrouching = false;
 }
 
 // Called to bind functionality to input
@@ -217,6 +247,7 @@ void APlayerMovement::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &APlayerMovement::StopJumping);
 	PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &APlayerMovement::Crouching);
 	PlayerInputComponent->BindAction("Crouch", IE_Released, this, &APlayerMovement::UnCrouching);
+	PlayerInputComponent->BindAction("Dash", IE_Pressed, this, &APlayerMovement::Dash);
 
 	PlayerInputComponent->BindAxis("MoveX", this, &APlayerMovement::MoveX);
 	PlayerInputComponent->BindAxis("MoveY", this, &APlayerMovement::MoveY);

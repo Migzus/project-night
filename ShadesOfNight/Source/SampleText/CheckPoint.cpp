@@ -21,6 +21,7 @@ void ACheckPoint::BeginPlay()
 	GetComponents(_Components);
 	for (auto Box : _Components)
 	{
+		SpawnPoint = Box->GetRelativeLocation();
 		Box->OnComponentBeginOverlap.AddDynamic(this, &ACheckPoint::OnOverlapEnter);
 	}
 
@@ -35,13 +36,9 @@ void ACheckPoint::OnOverlapEnter(UPrimitiveComponent* OverlappedComp, AActor* Ot
 	{
 		APlayerMovement* _Player = Cast<APlayerMovement>(OtherActor);
 
-		UE_LOG(LogTemp, Warning, TEXT("Prepare Spawnpoint"))
-
 		if (_Player)
 		{
 			_Player->SpawnPoint = SpawnPoint;
-
-			UE_LOG(LogTemp, Warning, TEXT("Setting Spawnpoint"))
 
 			HasCoughtThisCheckpint = true;
 		}
