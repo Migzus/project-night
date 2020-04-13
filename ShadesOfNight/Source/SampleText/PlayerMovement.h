@@ -61,9 +61,9 @@ public:
 	UPROPERTY(BlueprintReadonly)
 		bool IsCrouching{ false };
 	UPROPERTY(BlueprintReadonly)
-		bool IsHidden{ false };
-	UPROPERTY(BlueprintReadonly)
 		bool IsDashing{ false };
+	UPROPERTY(BlueprintReadonly)
+		bool IsHidden{ false };
 
 	FVector SpawnPoint;
 
@@ -71,7 +71,7 @@ public:
 	uint8 CoinsCollected{ 0 };
 
 protected:
-	FTimerHandle DashCooldownTimer;
+	FTimerHandle DashCooldownTimer, CrouchTimer;
 
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -85,6 +85,8 @@ private:
 	// this variable is set automatically
 	float StandardGravityScale{ 0.0f };
 	
+	bool CanStillHighJump{ false };
+
 	const uint8 AirDashAmount{ 1 };
 	uint8 CurrentAirDashCount{ 0 };
 	FVector KeepVelocity, InputDirection;
@@ -99,6 +101,7 @@ private:
 	void LongJump();
 	void Crouching();
 	void UnCrouching();
+	void CanHighJumpLag();
 
 public:	
 	// Called every frame

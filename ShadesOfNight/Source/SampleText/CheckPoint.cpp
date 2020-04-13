@@ -1,8 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
+#include "CheckPoint.h"
 #include "PlayerMovement.h"
 #include "Components/BoxComponent.h"
-#include "CheckPoint.h"
 
 // Sets default values
 ACheckPoint::ACheckPoint()

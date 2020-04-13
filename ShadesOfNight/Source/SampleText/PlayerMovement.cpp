@@ -1,5 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
+#include "PlayerMovement.h"
 #include "Components/InputComponent.h"
 #include "Components/MeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -8,7 +9,6 @@
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
 #include "SwitchBlockManager.h"
-#include "PlayerMovement.h"
 
 // Sets default values
 APlayerMovement::APlayerMovement()
@@ -70,11 +70,20 @@ void APlayerMovement::Tick(float DeltaTime)
 	if (GetCharacterMovement()->IsFalling())
 	{
 		GetCharacterMovement()->GravityScale = IsCrouching ? CrouchGravityScale : StandardGravityScale;
+		
+		if (IsCrouching)
+		{
+			CanStillHighJump = true;
+		}
 	}
 	else
 	{
 		PreviousWallReference = nullptr;
-		CurrentAirDashCount = 0;
+		
+		if (!IsDashing)
+		{
+			CurrentAirDashCount = 0;
+		}
 	}
 
 	GetCharacterMovement()->MaxWalkSpeed = GetCharacterMovement()->IsFalling() ? AirbornSpeed : IsCrouching ? CrouchSpeed : MaxSpeed;
@@ -154,38 +163,46 @@ void APlayerMovement::JumpLocal()
 	// if our character is still falling we want to enable wall jump
 	if (GetCharacterMovement()->IsFalling())
 	{
-		// prepare the ray results
-		FHitResult _Hit;
-		// ray origin
-		FVector _Start{ GetActorLocation() };
-		// ray end-point
-		FVector _End{ _Start + (KeepVelocity * 100.0f) };
-		//FVector _End{ _Start + (KeepVelocity.GetSafeNormal() * 100.0f) };
-
-		ECollisionChannel _WallJumpChannel{ ECollisionChannel::ECC_GameTraceChannel1 };
-	    
-		//DrawDebugLine(GetWorld(), _Start, _End, FColor::Red, false, 0.1f, 0, 6.0f);
-
-		// cast a ray to see if there is any wall with the WallJump tag
-		if (GetWorld()->LineTraceSingleByChannel(_Hit, _Start, _End, _WallJumpChannel))
+		for (size_t i = 0; i < 3; i++)
 		{
-			if (_Hit.GetActor() != PreviousWallReference)
+			float _Spread{ PI / 2.25 };
+			float _Angle{ KeepVelocity.HeadingAngle() - _Spread + _Spread * i };
+
+			// prepare the ray results
+			FHitResult _Hit;
+			// ray origin
+			FVector _Start{ GetActorLocation() };
+			// ray end-point
+			FVector _End{ _Start + FVector(FMath::Cos(_Angle), FMath::Sin(_Angle), 0.0f) * 100.0f };
+			//FVector _End{ _Start + (KeepVelocity.GetSafeNormal() * 100.0f) };
+
+			ECollisionChannel _WallJumpChannel{ ECollisionChannel::ECC_GameTraceChannel1 };
+
+			//DrawDebugLine(GetWorld(), _Start, _End, FColor::Red, false, 0.1f, 0, 6.0f);
+
+			// cast a ray to see if there is any wall with the WallJump tag
+			if (GetWorld()->LineTraceSingleByChannel(_Hit, _Start, _End, _WallJumpChannel))
 			{
-				// We need the direction of the ray
-				FVector _DirectionalVector{ _End - _Start };
+				if (_Hit.GetActor() != PreviousWallReference)
+				{
+					// We need the direction of the ray
+					FVector _DirectionalVector{ _End - _Start };
 
-				_DirectionalVector.Z = 0.0f;
-				_DirectionalVector = _DirectionalVector.GetSafeNormal();
+					_DirectionalVector.Z = 0.0f;
+					_DirectionalVector = _DirectionalVector.GetSafeNormal();
 
-				// mirror the direction vector
-				_DirectionalVector = _DirectionalVector.MirrorByVector(_Hit.ImpactNormal);
-				_DirectionalVector *= JumpOffWallSpeed;
-				_DirectionalVector += FVector::UpVector * WalljumpHeight;
+					// mirror the direction vector
+					_DirectionalVector = _DirectionalVector.MirrorByVector(_Hit.ImpactNormal);
+					_DirectionalVector *= JumpOffWallSpeed;
+					_DirectionalVector += FVector::UpVector * WalljumpHeight;
 
-				// finally we set the our new velocity to the directional vector, included force
-				GetCharacterMovement()->Velocity = _DirectionalVector;
+					// finally we set the our new velocity to the directional vector, included force
+					GetCharacterMovement()->Velocity = _DirectionalVector;
 
-				PreviousWallReference = _Hit.GetActor();
+					PreviousWallReference = _Hit.GetActor();
+
+					break;
+				}
 			}
 		}
 	}
@@ -223,6 +240,8 @@ void APlayerMovement::LongJump()
 {
 	FVector _Direction{ FVector(KeepVelocity.GetSafeNormal().X * LongJumpSpeed, KeepVelocity.GetSafeNormal().Y * LongJumpSpeed, LongJumpHeight) };
 
+	CanStillHighJump = false;
+
 	GetCharacterMovement()->AddForce(_Direction * 100000.0f);
 }
 
@@ -236,6 +255,13 @@ void APlayerMovement::UnCrouching()
 {
 	GetCharacterMovement()->MaxWalkSpeed = MaxSpeed;
 	IsCrouching = false;
+	CanStillHighJump = false;
+	//GetWorldTimerManager().SetTimer(CrouchTimer, this, &APlayerMovement::CanHighJumpLag, 0.17f, false);
+}
+
+void APlayerMovement::CanHighJumpLag()
+{
+	CanStillHighJump = false;
 }
 
 // Called to bind functionality to input

@@ -1,8 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
+#include "SwitchBlockManager.h"
 #include "Components/InputComponent.h"
 #include "Runtime/UMG/Public/UMG.h"
-#include "SwitchBlockManager.h"
 
 // Sets default values
 ASwitchBlockManager::ASwitchBlockManager()
