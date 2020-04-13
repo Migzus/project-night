@@ -2,7 +2,6 @@
 
 #include "SwitchBlockManager.h"
 #include "Components/InputComponent.h"
-#include "Runtime/UMG/Public/UMG.h"
 
 // Sets default values
 ASwitchBlockManager::ASwitchBlockManager()
