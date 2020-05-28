@@ -3,24 +3,37 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
-#include "CheckPoint.generated.h"
+#include "GameFramework/Pawn.h"
+#include "HomingMissile.generated.h"
 
 UCLASS()
-class SAMPLETEXT_API ACheckPoint : public AActor
+class SAMPLETEXT_API AHomingMissile : public APawn
 {
 	GENERATED_BODY()
+
+public:
+	// Sets default values for this pawn's properties
+	AHomingMissile();
 	
-public:	
-	// Sets default values for this actor's properties
-	ACheckPoint();
+	virtual void Tick(float DeltaTime) override;
+
+	template<class T> void SetTarget(T* pTarget)
+	{
+		if (!Cast<AActor>(Target))
+		{
+			return;
+		}
+
+		this->Target = Target;
+	}
 
 protected:
-	bool HasCoughtThisCheckpint{ false };
-
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	
+
+private:
+	class AActor* Target;
+
 	UFUNCTION()
 		void OnOverlapEnter(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 };

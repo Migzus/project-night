@@ -27,7 +27,6 @@ bool ASwitchBlockManager::CheckIsActive()
 void ASwitchBlockManager::Switch()
 {
 	IsActive = !IsActive;
-	UE_LOG(LogTemp, Warning, TEXT("%i"), IsActive)
 }
 
 // Called to bind functionality to input

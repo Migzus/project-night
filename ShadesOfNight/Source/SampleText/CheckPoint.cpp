@@ -21,12 +21,8 @@ void ACheckPoint::BeginPlay()
 	GetComponents(_Components);
 	for (auto Box : _Components)
 	{
-		SpawnPoint = Box->GetRelativeLocation();
 		Box->OnComponentBeginOverlap.AddDynamic(this, &ACheckPoint::OnOverlapEnter);
 	}
-
-	// Makes the spawnpoint relative to the owner/root (aka. this)
-	SpawnPoint += GetActorLocation();
 }
 
 void ACheckPoint::OnOverlapEnter(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -38,11 +34,9 @@ void ACheckPoint::OnOverlapEnter(UPrimitiveComponent* OverlappedComp, AActor* Ot
 
 		if (_Player)
 		{
-			_Player->SpawnPoint = SpawnPoint;
+			_Player->SpawnPoint = GetActorLocation();
 
 			HasCoughtThisCheckpint = true;
 		}
 	}
 }
-
-

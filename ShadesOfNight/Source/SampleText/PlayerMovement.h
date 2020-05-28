@@ -16,6 +16,9 @@ public:
 	APlayerMovement();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		// Jump Height
+		float JumpHeight{ 2300.0f };
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		// Grounded speed
 		float MaxSpeed{ 1500.0f };
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -55,8 +58,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		// The force that pushes the player in the desired direction after pressing the dash button
 		float DashForce{ 1300.0f };
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		float CrouchGravityScale{ 0.0f };
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TSubclassOf<class UUserWidget> PauseMenuPrefab;
 
 	UPROPERTY(BlueprintReadonly)
 		bool IsCrouching{ false };
@@ -65,6 +72,7 @@ public:
 	UPROPERTY(BlueprintReadonly)
 		bool IsHidden{ false };
 
+	// current spawnpoint
 	FVector SpawnPoint;
 
 	// placeholder
@@ -81,6 +89,7 @@ private:
 	class UCameraComponent* Camera;
 	class UMeshComponent* Mesh;
 	class AActor* PreviousWallReference;
+	class UUserWidget* PauseMenuInstance;
 
 	// this variable is set automatically
 	float StandardGravityScale{ 0.0f };
@@ -102,6 +111,8 @@ private:
 	void Crouching();
 	void UnCrouching();
 	void CanHighJumpLag();
+	void GotoBoss();
+	void PauseGame();
 
 public:	
 	// Called every frame

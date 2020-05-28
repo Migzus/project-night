@@ -4,6 +4,8 @@
 #include "Components/InputComponent.h"
 #include "Components/MeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Runtime/UMG/Public/UMG.h"
+#include "Kismet/GameplayStatics.h"
 #include "Camera/CameraComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
@@ -43,6 +45,8 @@ void APlayerMovement::BeginPlay()
 	StandardGravityScale = GetCharacterMovement()->GravityScale;
 
 	KeepVelocity = FRotator(InputDirection.GetSafeNormal().Rotation() + Camera->GetComponentRotation()).Vector();
+
+	PauseMenuInstance = CreateWidget<UUserWidget>(GetWorld(), PauseMenuPrefab);
 
 	// THIS WILL BE REMOVED //
 	SpawnPoint = FVector::UpVector * 15.0f;
@@ -160,6 +164,8 @@ void APlayerMovement::JumpLocal()
 
 	///////////////////////////////////////////////////////////
 
+	bPressedJump = true;
+
 	// if our character is still falling we want to enable wall jump
 	if (GetCharacterMovement()->IsFalling())
 	{
@@ -222,7 +228,8 @@ void APlayerMovement::JumpLocal()
 		}
 
 		// otherwise just do a standard jump
-		Jump();
+		//Jump();
+		GetCharacterMovement()->Velocity.Z = JumpHeight;
 	}
 }
 
@@ -233,7 +240,9 @@ void APlayerMovement::HighJump()
 	_Direction.X *= -1.0f;
 	_Direction.Y *= -1.0f;
 
-	GetCharacterMovement()->AddForce(_Direction * 100000.0f);
+	GetCharacterMovement()->Velocity = _Direction;
+
+	//GetCharacterMovement()->AddForce(_Direction * 100000.0f);
 }
 
 void APlayerMovement::LongJump()
@@ -242,7 +251,9 @@ void APlayerMovement::LongJump()
 
 	CanStillHighJump = false;
 
-	GetCharacterMovement()->AddForce(_Direction * 100000.0f);
+	GetCharacterMovement()->Velocity = _Direction;
+
+	//GetCharacterMovement()->AddForce(_Direction * 100000.0f);
 }
 
 void APlayerMovement::Crouching()
@@ -264,6 +275,31 @@ void APlayerMovement::CanHighJumpLag()
 	CanStillHighJump = false;
 }
 
+void APlayerMovement::GotoBoss()
+{
+	UGameplayStatics::OpenLevel(this, "Boss_lvl");
+}
+
+void APlayerMovement::PauseGame()
+{
+	bool _IsPaused{ UGameplayStatics::IsGamePaused(GetWorld()) };
+
+	if (!_IsPaused)
+	{
+		if (PauseMenuInstance)
+		{
+			PauseMenuInstance->AddToViewport();
+		}
+	}
+	else
+	{
+		PauseMenuInstance->RemoveFromViewport();
+	}
+
+	UGameplayStatics::SetGamePaused(GetWorld(), !_IsPaused);
+	GetWorld()->GetFirstPlayerController()->bShowMouseCursor = !_IsPaused;
+}
+
 // Called to bind functionality to input
 void APlayerMovement::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -277,5 +313,8 @@ void APlayerMovement::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 
 	PlayerInputComponent->BindAxis("MoveX", this, &APlayerMovement::MoveX);
 	PlayerInputComponent->BindAxis("MoveY", this, &APlayerMovement::MoveY);
+
+	PlayerInputComponent->BindAction("Cheat", IE_Pressed, this, &APlayerMovement::GotoBoss);
+	PlayerInputComponent->BindAction("Pause", IE_Pressed, this, &APlayerMovement::PauseGame);
 }
 
